@@ -1,52 +1,36 @@
-/**
- * POLERA STORE — Modern T-Shirt E-Commerce
- * ==========================================
- * Stack: React (hooks), Tailwind (CDN), CSS-in-JS via inline styles
- * Architecture: Context API for cart state, modular component structure
- * Ready for: Stripe integration, REST/GraphQL API, Auth, CMS
- *
- * Components:
- *  - App (router state)
- *  - CartContext (global state)
- *  - Navbar
- *  - HomePage (banner + featured + categories)
- *  - StorePage (grid + filters)
- *  - ProductDetailPage
- *  - CartDrawer
- *  - Footer
- *
- * Mock data lives in /data/products.js (inline here for portability)
- * To connect a real backend, replace `MOCK_PRODUCTS` with an API fetch.
- */
-
-import { useState, useContext, createContext, useReducer, useCallback, useEffect, useRef } from "react";
+import { useState, useContext, createContext, useReducer, useCallback, useEffect } from "react";
 
 // ─────────────────────────────────────────────
 // DESIGN TOKENS
 // ─────────────────────────────────────────────
 const T = {
   black:   "#0A0A0A",
-  white:   "#FAFAFA",
-  offWhite:"#F4F1EC",
-  sand:    "#E8E2D7",
+  white:   "#FFFFFF",
+  offWhite:"#F7F5F2",
+  sand:    "#EDE8E0",
   stone:   "#C2BAA8",
-  muted:   "#8A8275",
-  accent:  "#C8461A",   // terracotta — brand accent
-  accentL: "#E8825E",
-  accentD: "#8C2E0C",
-  dark:    "#1A1714",
+  muted:   "#7A7468",
+  accent:  "#1A1A1A",       // negro puro como acento principal
+  accentL: "#444444",
+  accentD: "#000000",
+  lime:    "#C8F04A",       // verde lima — acento vibrante gym
+  limeD:   "#A8CC30",
+  dark:    "#111111",
+  darker:  "#080808",
   cardBg:  "#FFFFFF",
-  borderL: "#E8E2D7",
+  borderL: "#E4E0D8",
   success: "#2D7A4F",
+  tag:     "#C8F04A",
 };
 
 const FONT = {
-  display: "'Playfair Display', Georgia, serif",
+  display: "'Bebas Neue', 'Anton', Impact, sans-serif",
   body:    "'DM Sans', system-ui, sans-serif",
+  accent:  "'Playfair Display', Georgia, serif",
 };
 
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital@1&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body { font-family: ${FONT.body}; background: ${T.offWhite}; color: ${T.black}; }
@@ -55,91 +39,77 @@ const CSS = `
   a { text-decoration: none; color: inherit; }
   img { display: block; max-width: 100%; }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: ${T.offWhite}; }
-  ::-webkit-scrollbar-thumb { background: ${T.stone}; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
 
-  /* Animations */
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(24px); }
+    from { opacity: 0; transform: translateY(28px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes fadeIn {
-    from { opacity: 0; } to { opacity: 1; }
-  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideInRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to   { transform: translateX(0);    opacity: 1; }
+    from { transform: translateX(110%); }
+    to   { transform: translateX(0); }
   }
-  @keyframes pulse {
-    0%,100% { transform: scale(1); }
-    50%      { transform: scale(1.08); }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
   }
-  @keyframes shimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position:  200% 0; }
+  @keyframes glowPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(200,240,74,0); }
+    50%      { box-shadow: 0 0 20px 4px rgba(200,240,74,0.35); }
   }
 
-  .fade-up   { animation: fadeUp   0.55s ease both; }
-  .fade-in   { animation: fadeIn   0.4s  ease both; }
-  .slide-in  { animation: slideInRight 0.38s cubic-bezier(.22,.68,0,1.2) both; }
+  .fade-up  { animation: fadeUp  0.6s cubic-bezier(.16,1,.3,1) both; }
+  .fade-in  { animation: fadeIn  0.4s ease both; }
+  .slide-in { animation: slideInRight 0.4s cubic-bezier(.16,1,.3,1) both; }
 
-  /* Product card hover */
-  .product-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-  .product-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px rgba(0,0,0,0.10); }
-  .product-card:hover .card-img { transform: scale(1.04); }
-  .card-img { transition: transform 0.4s ease; }
+  .product-card { transition: transform 0.3s cubic-bezier(.16,1,.3,1), box-shadow 0.3s ease; }
+  .product-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px rgba(0,0,0,0.13); }
+  .product-card:hover .card-img { transform: scale(1.05); }
+  .card-img { transition: transform 0.5s cubic-bezier(.16,1,.3,1); }
 
-  /* Btn hover */
-  .btn-primary { transition: background 0.2s, transform 0.15s; }
-  .btn-primary:hover { background: ${T.accentD} !important; transform: translateY(-1px); }
-  .btn-primary:active { transform: translateY(0); }
+  .btn-lime { transition: background 0.2s, transform 0.15s, box-shadow 0.2s; }
+  .btn-lime:hover { background: ${T.limeD} !important; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(200,240,74,0.4); }
+  .btn-lime:active { transform: translateY(0); }
 
-  .btn-outline { transition: background 0.2s, color 0.2s, transform 0.15s; }
-  .btn-outline:hover { background: ${T.black} !important; color: ${T.white} !important; transform: translateY(-1px); }
+  .btn-dark { transition: background 0.2s, transform 0.15s; }
+  .btn-dark:hover { background: #333 !important; transform: translateY(-2px); }
 
-  /* Nav link underline */
+  .btn-outline-w { transition: background 0.2s, color 0.2s, transform 0.15s; }
+  .btn-outline-w:hover { background: white !important; color: black !important; transform: translateY(-2px); }
+
   .nav-link { position: relative; }
-  .nav-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1.5px; background: ${T.accent}; transition: width 0.25s ease; }
+  .nav-link::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 0; height: 2px; background: ${T.lime}; transition: width 0.25s ease; }
   .nav-link:hover::after, .nav-link.active::after { width: 100%; }
 
-  /* Filter pill */
-  .filter-pill { transition: background 0.18s, color 0.18s, border-color 0.18s; }
-  .filter-pill:hover { border-color: ${T.accent}; color: ${T.accent}; }
-  .filter-pill.active-pill { background: ${T.accent}; color: ${T.white}; border-color: ${T.accent}; }
+  .filter-pill { transition: all 0.18s; }
+  .filter-pill:hover { border-color: ${T.black}; }
+  .filter-pill.active-pill { background: ${T.black}; color: ${T.white}; border-color: ${T.black}; }
 
-  /* Size btn */
-  .size-btn { transition: background 0.15s, color 0.15s, border-color 0.15s; }
-  .size-btn:hover { border-color: ${T.black}; }
+  .size-btn { transition: all 0.15s; }
+  .size-btn:hover { border-color: ${T.black}; background: ${T.sand}; }
   .size-btn.selected-size { background: ${T.black}; color: ${T.white}; border-color: ${T.black}; }
 
-  /* Color swatch */
-  .color-swatch { transition: box-shadow 0.15s; }
+  .color-swatch { transition: box-shadow 0.15s, transform 0.15s; }
+  .color-swatch:hover { transform: scale(1.15); }
   .color-swatch.selected-color { box-shadow: 0 0 0 3px ${T.white}, 0 0 0 5px ${T.black}; }
 
-  /* Cart item */
-  .cart-item { transition: background 0.2s; }
   .cart-item:hover { background: ${T.offWhite}; }
-
-  /* overlay */
   .overlay { animation: fadeIn 0.25s ease both; }
 
-  /* tag badge */
-  .badge-new { background: ${T.accent}; color: ${T.white}; }
-  .badge-sale { background: ${T.black}; color: ${T.white}; }
-
-  /* Qty control */
-  .qty-btn { transition: background 0.15s; }
   .qty-btn:hover { background: ${T.sand}; }
+  .search-input:focus { outline: none; border-color: ${T.black}; }
+  .promo-card { animation: glowPulse 2.5s ease-in-out infinite; }
 
-  /* Search input */
-  .search-input:focus { outline: none; border-color: ${T.accent}; }
+  .marquee-track { display: flex; animation: marquee 18s linear infinite; white-space: nowrap; }
+  .marquee-track:hover { animation-play-state: paused; }
 
-  /* Mobile hamburger */
   @media (max-width: 768px) {
     .desktop-nav { display: none !important; }
     .mobile-menu-btn { display: flex !important; }
+    .two-col { grid-template-columns: 1fr !important; }
   }
   @media (min-width: 769px) {
     .mobile-menu-btn { display: none !important; }
@@ -148,158 +118,60 @@ const CSS = `
 `;
 
 // ─────────────────────────────────────────────
-// MOCK DATA — Replace with API fetch
+// DATA
 // ─────────────────────────────────────────────
 const COLORS_MAP = {
-  "Blanco":    "#F5F5F5",
-  "Negro":     "#1A1A1A",
-  "Arena":     "#D4C5A9",
-  "Terracota": "#C8461A",
-  "Verde":     "#4A7C59",
-  "Marino":    "#2C3E6B",
-  "Gris":      "#8A8A8A",
-  "Celeste":   "#7EB8D4",
+  "Negro":  "#1A1A1A",
+  "Blanco": "#F5F5F5",
+  "Gris":   "#8A8A8A",
+  "Café":   "#7B5B3A",
+};
+
+const BUZO_COLORS_MAP = {
+  "Negro": "#1A1A1A",
+  "Gris":  "#8A8A8A",
 };
 
 const MOCK_PRODUCTS = [
   {
-    id: "p001",
-    name: "Esencial Clásica",
-    category: "Básicas",
-    price: 24990,
+    id: "polera-001",
+    name: "Polera Oversize",
+    type: "Polera",
+    price: 11990,
     originalPrice: null,
-    colors: ["Blanco","Negro","Arena","Gris"],
+    promoPrice: 18990,
+    promoQty: 2,
+    colors: ["Negro","Blanco","Gris","Café"],
     sizes: ["XS","S","M","L","XL","XXL"],
     tag: "nuevo",
-    rating: 4.8,
-    reviews: 124,
-    description: "La base perfecta de cualquier guardarropa. Confeccionada en 100% algodón pima peruano de 200gsm, con corte unisex ligeramente oversized y costuras reforzadas. Suave, duradera y que mejora con cada lavado.",
-    details: ["100% Algodón Pima Peruano","200 GSM","Corte Unisex Oversized","Costura Triple Reforzada","Libre de sustancias nocivas (OEKO-TEX)"],
-    image: null,
-    emoji: "🤍",
-  },
-  {
-    id: "p002",
-    name: "Vintage Washed",
-    category: "Premium",
-    price: 34990,
-    originalPrice: 39990,
-    colors: ["Terracota","Arena","Verde","Marino"],
-    sizes: ["XS","S","M","L","XL"],
-    tag: "sale",
     rating: 4.9,
-    reviews: 89,
-    description: "Teñida a mano con técnica acid-wash artesanal. Cada polera es única — pequeñas variaciones de color son parte del proceso. Tela heavyweight 320gsm para ese look desgastado premium.",
-    details: ["100% Algodón Heavyweight 320gsm","Acid-Wash Artesanal","Cada pieza es única","Corte Boxy"],
-    image: null,
-    emoji: "🧡",
+    reviews: 0,
+    description: "Diseñada para quien entrena. Corte oversize con caída perfecta — ni muy holgada ni muy ceñida. No importa si estás en tu mejor momento físico o empezando el camino: esta polera te va a quedar increíble y vas a querer ponértela todos los días. 100% algodón, suave al tacto y transpirable.",
+    details: ["100% Algodón heavyweight","Corte Oversize / Boxy Fit","Transpirable y cómoda para entrenar","Costuras reforzadas","Disponible en Negro, Blanco, Gris y Café"],
+    emoji: "👕",
   },
   {
-    id: "p003",
-    name: "Minimal Graphic",
-    category: "Gráficas",
-    price: 29990,
+    id: "buzo-001",
+    name: "Buzo Baggy",
+    type: "Buzo",
+    price: 14990,
     originalPrice: null,
-    colors: ["Negro","Blanco","Marino"],
-    sizes: ["S","M","L","XL","XXL"],
-    tag: "nuevo",
-    rating: 4.7,
-    reviews: 56,
-    description: "Gráfica minimalista impresa con tintas al agua libres de plástico. El diseño está inspirado en la topografía de los Andes. Impresión DTF premium que no craquea ni se desprende.",
-    details: ["Tela 220gsm Ringspun","Impresión DTF Premium","Tintas al agua","Gráfica Andes Topográfico"],
-    image: null,
-    emoji: "⛰️",
-  },
-  {
-    id: "p004",
-    name: "Essential Pocket",
-    category: "Básicas",
-    price: 21990,
-    originalPrice: null,
-    colors: ["Blanco","Celeste","Verde","Gris"],
-    sizes: ["XS","S","M","L","XL"],
-    tag: null,
-    rating: 4.6,
-    reviews: 203,
-    description: "El clásico con bolsillo. Un detalle funcional que cambia todo. Corte regular fit, perfecta para el día a día. El bolsillo es ligeramente más oscuro que la tela para un look diferenciado.",
-    details: ["100% Algodón 180gsm","Bolsillo Frontal","Corte Regular Fit","Cuello redondo reforzado"],
-    image: null,
-    emoji: "💙",
-  },
-  {
-    id: "p005",
-    name: "Oversized Statement",
-    category: "Premium",
-    price: 39990,
-    originalPrice: null,
-    colors: ["Negro","Arena","Terracota"],
-    sizes: ["S","M","L","XL","XXL"],
-    tag: "nuevo",
-    rating: 5.0,
-    reviews: 34,
-    description: "El oversized que realmente funciona. Patrón desarrollado especialmente para no perder estructura al ser grande. Mangas caídas con el largo justo, largo al muslo, y una sutil textura slub que le da profundidad.",
-    details: ["Algodón Slub 260gsm","Corte Oversized Estructurado","Largo Extended al muslo","Costura visible decorativa"],
-    image: null,
-    emoji: "🖤",
-  },
-  {
-    id: "p006",
-    name: "Longline Zen",
-    category: "Gráficas",
-    price: 32990,
-    originalPrice: 38990,
-    colors: ["Negro","Blanco","Marino"],
-    sizes: ["XS","S","M","L","XL"],
-    tag: "sale",
-    rating: 4.8,
-    reviews: 71,
-    description: "Corte longline con abertura lateral. Impresión de caligrafía japonesa en la espalda. Una pieza que funciona sola o en capas. Tela ultra-suave con caída natural.",
-    details: ["Mezcla Algodón-Modal 50/50","Caída Natural Fluida","Impresión Caligrafía Reversa","Corte Longline con Split Lateral"],
-    image: null,
-    emoji: "🎋",
-  },
-  {
-    id: "p007",
-    name: "Surf Culture",
-    category: "Gráficas",
-    price: 27990,
-    originalPrice: null,
-    colors: ["Celeste","Arena","Blanco"],
-    sizes: ["S","M","L","XL"],
-    tag: null,
-    rating: 4.7,
-    reviews: 48,
-    description: "Inspirada en la cultura costera sudamericana. Gráfica de ola minimalista en el pecho izquierdo. Tela ligera, perfecta para el calor y la playa.",
-    details: ["Algodón Ligero 160gsm","Gráfica Serigráfica","Corte Regular","Tejido Transpirable"],
-    image: null,
-    emoji: "🌊",
-  },
-  {
-    id: "p008",
-    name: "Ribbed Crop",
-    category: "Premium",
-    price: 28990,
-    originalPrice: null,
-    colors: ["Blanco","Gris","Terracota","Negro"],
-    sizes: ["XS","S","M","L"],
+    promoPrice: null,
+    promoQty: null,
+    colors: ["Negro","Gris"],
+    sizes: ["XS","S","M","L","XL","XXL"],
     tag: "nuevo",
     rating: 4.9,
-    reviews: 92,
-    description: "Polera crop en tejido acanalado (ribbed). La textura añade dimensión y el corte ligeramente ceñido realza la silueta. Perfecta para usar sola o con un overshirt abierto.",
-    details: ["Algodón Acanalado Ribbed","Corte Crop Ligeramente Ceñido","Cuello redondo elástico","Colores neutros permanentes"],
-    image: null,
-    emoji: "✨",
+    reviews: 0,
+    description: "El buzo que faltaba. Corte baggy recto y ancho — cómodo para entrenar, para descansar, para todo. Diseño limpio y minimalista que se ve impecable. Tela gruesa y suave que abraza sin apretar.",
+
+    details: ["Tela pesada y suave","Corte Baggy recto","Elástico en cintura y puños","Diseño minimalista sin prints","Disponible en Negro y Gris"],
+    emoji: "🩳",
   },
 ];
 
-const CATEGORIES = ["Todas", "Básicas", "Premium", "Gráficas"];
-const SIZES_ALL  = ["XS","S","M","L","XL","XXL"];
-const PRICE_RANGES = [
-  { label: "Todos", min: 0, max: Infinity },
-  { label: "Hasta $25.000", min: 0, max: 25000 },
-  { label: "$25.000–$35.000", min: 25000, max: 35000 },
-  { label: "$35.000+", min: 35000, max: Infinity },
-];
+const CATEGORIES = ["Todos", "Polera", "Buzo"];
+const SIZES_ALL = ["XS","S","M","L","XL","XXL"];
 
 // ─────────────────────────────────────────────
 // CART CONTEXT
@@ -316,14 +188,10 @@ function cartReducer(state, action) {
       }
       return { ...state, items: [...state.items, { key, product: action.product, color: action.color, size: action.size, qty: action.qty }] };
     }
-    case "REMOVE":
-      return { ...state, items: state.items.filter(i => i.key !== action.key) };
-    case "UPDATE_QTY":
-      return { ...state, items: state.items.map(i => i.key === action.key ? { ...i, qty: Math.max(1, action.qty) } : i) };
-    case "CLEAR":
-      return { ...state, items: [] };
-    default:
-      return state;
+    case "REMOVE": return { ...state, items: state.items.filter(i => i.key !== action.key) };
+    case "UPDATE_QTY": return { ...state, items: state.items.map(i => i.key === action.key ? { ...i, qty: Math.max(1, action.qty) } : i) };
+    case "CLEAR": return { ...state, items: [] };
+    default: return state;
   }
 }
 
@@ -334,7 +202,7 @@ function CartProvider({ children }) {
 
   const addToCart = useCallback((product, color, size, qty = 1) => {
     dispatch({ type: "ADD", product, color, size, qty });
-    setNotification(`${product.name} agregado al carrito`);
+    setNotification(`${product.name} agregado`);
     setTimeout(() => setNotification(null), 2500);
     setIsOpen(true);
   }, []);
@@ -354,46 +222,60 @@ function CartProvider({ children }) {
 }
 
 // ─────────────────────────────────────────────
-// UTILITIES
+// UTILS
 // ─────────────────────────────────────────────
-function formatPrice(n) {
-  return `$${n.toLocaleString("es-CL")}`;
-}
-
-function StarRating({ rating, reviews }) {
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-      <div style={{ display:"flex", gap:1 }}>
-        {[1,2,3,4,5].map(s => (
-          <span key={s} style={{ fontSize:12, color: s <= Math.round(rating) ? "#E8A020" : T.stone }}>★</span>
-        ))}
-      </div>
-      <span style={{ fontSize:12, color:T.muted }}>({reviews})</span>
-    </div>
-  );
-}
-
-// Product color placeholder (since we don't have real images)
-function ProductVisual({ product, color = null, size = "full" }) {
-  const bg = color ? COLORS_MAP[color] : COLORS_MAP[product.colors[0]];
-  const dim = size === "full" ? { width:"100%", paddingBottom:"120%" } : { width:64, height:64, paddingBottom:0 };
-  return (
-    <div style={{ ...dim, background: bg || "#E8E2D7", display:"flex", alignItems:"center", justifyContent:"center", position: size==="full" ? "relative" : "static", borderRadius: size==="full" ? 0 : 8, flexShrink:0 }}>
-      {size === "full" && (
-        <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:8 }}>
-          <span style={{ fontSize:64 }}>{product.emoji}</span>
-          <span style={{ fontFamily:FONT.display, fontSize:13, color: isLight(bg) ? "#333" : "#eee", letterSpacing:2, textTransform:"uppercase", opacity:0.6 }}>{product.name}</span>
-        </div>
-      )}
-      {size !== "full" && <span style={{ fontSize:28 }}>{product.emoji}</span>}
-    </div>
-  );
-}
+const fmt = n => `$${n.toLocaleString("es-CL")}`;
 
 function isLight(hex) {
   if (!hex) return true;
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   return (r*299 + g*587 + b*114) / 1000 > 150;
+}
+
+// Mapeo de imagen por producto Y color
+const PRODUCT_IMAGES = {
+  "polera-001": {
+    "Negro":  "/images/Polera-Negro.png",
+    "Blanco": "/images/Polera-Blanco.png",
+    "Gris":   "/images/Polera-Gris.png",
+    "Café":   "/images/Polera-Cafe.png",
+  },
+  "buzo-001": {
+    "Negro": "/images/Buzo-Negro.png",
+    "Gris":  "/images/Buzo-Gris.png",
+  },
+};
+
+function ProductVisual({ product, color = null, size = "full" }) {
+  const map = product.type === "Buzo" ? BUZO_COLORS_MAP : COLORS_MAP;
+  const activeColor = color || product.colors[0];
+  const bg = map[activeColor] || "#ccc";
+  const imgSrc = PRODUCT_IMAGES[product.id]?.[activeColor] || null;
+
+  if (size !== "full") return (
+    <div style={{ width:64, height:64, borderRadius:8, overflow:"hidden", flexShrink:0, background:bg }}>
+      {imgSrc
+        ? <img src={imgSrc} alt={product.name} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+        : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ fontSize:26 }}>{product.emoji}</span></div>
+      }
+    </div>
+  );
+
+  return (
+    <div style={{ width:"100%", paddingBottom:"115%", position:"relative", background: bg }}>
+      {imgSrc ? (
+        <img src={imgSrc} alt={`${product.name} ${activeColor}`}
+          style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", transition:"opacity 0.3s ease" }}/>
+      ) : (
+        <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10 }}>
+          <span style={{ fontSize:72 }}>{product.emoji}</span>
+          <span style={{ fontFamily:FONT.display, fontSize:15, color: isLight(bg)?"rgba(0,0,0,0.3)":"rgba(255,255,255,0.3)", letterSpacing:4, textTransform:"uppercase" }}>
+            {product.name}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -405,64 +287,63 @@ function Navbar({ page, setPage }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handler);
-    return () => window.removeEventListener("scroll", handler);
+    const h = () => setScrolled(window.scrollY > 30);
+    window.addEventListener("scroll", h);
+    return () => window.removeEventListener("scroll", h);
   }, []);
 
-  const nav = [
-    { label: "Inicio",   page: "home"  },
-    { label: "Tienda",   page: "store" },
-    { label: "Nosotros", page: "about" },
-    { label: "Contacto", page: "contact"},
+  const links = [
+    { label:"Inicio", page:"home" },
+    { label:"Tienda", page:"store" },
+    { label:"Nosotros", page:"about" },
+    { label:"Contacto", page:"contact" },
   ];
 
-  const bgStyle = {
-    position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-    background: scrolled ? "rgba(250,249,247,0.96)" : "transparent",
-    backdropFilter: scrolled ? "blur(10px)" : "none",
-    borderBottom: scrolled ? `1px solid ${T.borderL}` : "none",
-    transition: "background 0.3s, border 0.3s, backdrop-filter 0.3s",
-    padding: "0 5%",
-  };
-
   return (
-    <nav style={bgStyle}>
-      <div style={{ maxWidth:1280, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:70 }}>
+    <nav style={{
+      position:"fixed", top:0, left:0, right:0, zIndex:100,
+      background: scrolled ? "rgba(8,8,8,0.97)" : "transparent",
+      backdropFilter: scrolled ? "blur(12px)" : "none",
+      borderBottom: scrolled ? "1px solid rgba(255,255,255,0.07)" : "none",
+      transition: "all 0.35s ease",
+      padding:"0 5%",
+    }}>
+      <div style={{ maxWidth:1280, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:68 }}>
+
         {/* Logo */}
-        <button onClick={() => setPage("home")} style={{ fontFamily:FONT.display, fontSize:22, fontWeight:700, color:T.black, letterSpacing:-0.5 }}>
-          VESTE<span style={{ color:T.accent }}>.</span>
+        <button onClick={() => setPage("home")} style={{ display:"flex", alignItems:"baseline", gap:3 }}>
+          <span style={{ fontFamily:FONT.display, fontSize:28, letterSpacing:3, color:T.white, lineHeight:1 }}>MACIZOS</span>
+          <span style={{ fontFamily:FONT.display, fontSize:28, letterSpacing:3, color:T.lime, lineHeight:1 }}>.</span>
         </button>
 
-        {/* Desktop nav */}
-        <div className="desktop-nav" style={{ display:"flex", gap:32, alignItems:"center" }}>
-          {nav.map(n => (
-            <button key={n.page} onClick={() => setPage(n.page)}
-              className={`nav-link ${page===n.page?"active":""}`}
-              style={{ fontSize:14, fontWeight:500, color: page===n.page ? T.accent : T.black, background:"none", letterSpacing:0.3 }}>
-              {n.label}
+        {/* Desktop links */}
+        <div className="desktop-nav" style={{ display:"flex", gap:36, alignItems:"center" }}>
+          {links.map(l => (
+            <button key={l.page} onClick={() => setPage(l.page)}
+              className={`nav-link ${page===l.page?"active":""}`}
+              style={{ fontSize:13, fontWeight:600, color: page===l.page ? T.lime : "rgba(255,255,255,0.75)", letterSpacing:1.5, textTransform:"uppercase" }}>
+              {l.label}
             </button>
           ))}
         </div>
 
-        {/* Right actions */}
-        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-          <button onClick={() => setIsOpen(true)} style={{ position:"relative", padding:8, borderRadius:8, background:"none" }}>
-            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={T.black} strokeWidth={1.8}>
+        {/* Right */}
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <button onClick={() => setIsOpen(true)} style={{ position:"relative", padding:"8px 10px", borderRadius:8, border:"1px solid rgba(255,255,255,0.15)", background:"rgba(255,255,255,0.05)" }}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.8}>
               <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
             </svg>
             {count > 0 && (
-              <span style={{ position:"absolute", top:2, right:2, width:17, height:17, background:T.accent, color:T.white, borderRadius:"50%", fontSize:10, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <span style={{ position:"absolute", top:-6, right:-6, width:18, height:18, background:T.lime, color:T.black, borderRadius:"50%", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
                 {count > 9 ? "9+" : count}
               </span>
             )}
           </button>
 
-          {/* Mobile hamburger */}
           <button className="mobile-menu-btn" onClick={() => setMobileOpen(!mobileOpen)}
             style={{ display:"none", flexDirection:"column", gap:5, padding:8 }}>
             {[0,1,2].map(i => (
-              <span key={i} style={{ display:"block", width:22, height:1.5, background:T.black, transition:"0.3s",
+              <span key={i} style={{ display:"block", width:22, height:1.5, background:"white", transition:"0.3s",
                 transform: mobileOpen ? (i===0?"rotate(45deg) translate(4.5px,4.5px)":i===2?"rotate(-45deg) translate(4.5px,-4.5px)":"scaleX(0)") : "none"
               }}/>
             ))}
@@ -472,11 +353,11 @@ function Navbar({ page, setPage }) {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="mobile-nav" style={{ background:"rgba(250,249,247,0.98)", padding:"16px 5% 24px", borderTop:`1px solid ${T.borderL}` }}>
-          {nav.map(n => (
-            <button key={n.page} onClick={() => { setPage(n.page); setMobileOpen(false); }}
-              style={{ display:"block", width:"100%", textAlign:"left", padding:"12px 0", fontSize:18, fontWeight:500, fontFamily:FONT.display, color: page===n.page ? T.accent : T.black, borderBottom:`1px solid ${T.borderL}` }}>
-              {n.label}
+        <div className="mobile-nav" style={{ background:"rgba(8,8,8,0.98)", padding:"12px 5% 24px", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+          {links.map(l => (
+            <button key={l.page} onClick={() => { setPage(l.page); setMobileOpen(false); }}
+              style={{ display:"block", width:"100%", textAlign:"left", padding:"14px 0", fontSize:22, fontFamily:FONT.display, letterSpacing:3, color: page===l.page ? T.lime : "white", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
+              {l.label}
             </button>
           ))}
         </div>
@@ -490,13 +371,12 @@ function Navbar({ page, setPage }) {
 // ─────────────────────────────────────────────
 function CartDrawer() {
   const { items, removeFromCart, updateQty, total, count, isOpen, setIsOpen, clearCart } = useContext(CartContext);
-  const [checkoutDone, setCheckoutDone] = useState(false);
+  const [done, setDone] = useState(false);
 
   const handleCheckout = () => {
-    // TODO: integrate Stripe / payment gateway here
-    setCheckoutDone(true);
+    setDone(true);
     clearCart();
-    setTimeout(() => { setCheckoutDone(false); setIsOpen(false); }, 2800);
+    setTimeout(() => { setDone(false); setIsOpen(false); }, 3000);
   };
 
   if (!isOpen) return null;
@@ -504,60 +384,57 @@ function CartDrawer() {
   return (
     <>
       <div className="overlay" onClick={() => setIsOpen(false)}
-        style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:200 }}/>
-      <div className="slide-in" style={{ position:"fixed", top:0, right:0, bottom:0, width:"min(440px, 100vw)", background:T.white, zIndex:201, display:"flex", flexDirection:"column", boxShadow:"-8px 0 32px rgba(0,0,0,0.12)" }}>
+        style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:200 }}/>
+      <div className="slide-in" style={{ position:"fixed", top:0, right:0, bottom:0, width:"min(440px,100vw)", background:T.white, zIndex:201, display:"flex", flexDirection:"column", boxShadow:"-12px 0 48px rgba(0,0,0,0.2)" }}>
 
         {/* Header */}
-        <div style={{ padding:"20px 24px", borderBottom:`1px solid ${T.borderL}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ padding:"20px 24px", borderBottom:`1px solid ${T.borderL}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:T.dark }}>
           <div>
-            <h2 style={{ fontFamily:FONT.display, fontSize:20, fontWeight:700 }}>Tu Carrito</h2>
-            <p style={{ fontSize:13, color:T.muted, marginTop:2 }}>{count} {count===1?"producto":"productos"}</p>
+            <h2 style={{ fontFamily:FONT.display, fontSize:22, letterSpacing:3, color:T.white }}>CARRITO</h2>
+            <p style={{ fontSize:12, color:"rgba(255,255,255,0.45)", marginTop:2, letterSpacing:1 }}>{count} {count===1?"PRODUCTO":"PRODUCTOS"}</p>
           </div>
-          <button onClick={() => setIsOpen(false)} style={{ padding:8, borderRadius:8, background:T.offWhite }}>
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={T.black} strokeWidth={2}>
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
+          <button onClick={() => setIsOpen(false)} style={{ padding:8, borderRadius:8, background:"rgba(255,255,255,0.08)", color:"white" }}>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
 
         {/* Items */}
         <div style={{ flex:1, overflowY:"auto", padding:"16px 24px" }}>
-          {checkoutDone && (
-            <div className="fade-in" style={{ textAlign:"center", padding:"40px 20px" }}>
+          {done && (
+            <div className="fade-in" style={{ textAlign:"center", padding:"50px 20px" }}>
               <div style={{ fontSize:56 }}>🎉</div>
-              <h3 style={{ fontFamily:FONT.display, fontSize:22, marginTop:16 }}>¡Gracias por tu compra!</h3>
-              <p style={{ color:T.muted, marginTop:8, fontSize:14 }}>Recibirás un email de confirmación pronto.</p>
+              <h3 style={{ fontFamily:FONT.display, fontSize:24, letterSpacing:3, marginTop:16 }}>¡GRACIAS!</h3>
+              <p style={{ color:T.muted, marginTop:8 }}>Pronto te contactamos para coordinar tu pedido.</p>
             </div>
           )}
-          {!checkoutDone && items.length === 0 && (
-            <div style={{ textAlign:"center", padding:"60px 20px", color:T.muted }}>
+          {!done && items.length === 0 && (
+            <div style={{ textAlign:"center", padding:"60px 20px" }}>
               <div style={{ fontSize:48, marginBottom:16 }}>🛍️</div>
-              <p style={{ fontSize:16, fontFamily:FONT.display }}>Tu carrito está vacío</p>
-              <button onClick={() => setIsOpen(false)}
-                style={{ marginTop:20, padding:"10px 24px", background:T.accent, color:T.white, borderRadius:8, fontSize:14, fontWeight:600 }}>
-                Explorar Tienda
+              <p style={{ fontFamily:FONT.display, fontSize:20, letterSpacing:2 }}>VACÍO</p>
+              <button onClick={() => setIsOpen(false)} className="btn-dark"
+                style={{ marginTop:24, padding:"11px 28px", background:T.black, color:T.white, borderRadius:8, fontSize:14, fontWeight:700, letterSpacing:1 }}>
+                Ver Tienda
               </button>
             </div>
           )}
-          {!checkoutDone && items.map(item => (
-            <div key={item.key} className="cart-item" style={{ display:"flex", gap:14, padding:"14px 8px", borderBottom:`1px solid ${T.borderL}`, borderRadius:8 }}>
+          {!done && items.map(item => (
+            <div key={item.key} className="cart-item" style={{ display:"flex", gap:14, padding:"14px 6px", borderBottom:`1px solid ${T.borderL}`, borderRadius:8, transition:"background 0.2s" }}>
               <ProductVisual product={item.product} color={item.color} size="sm"/>
               <div style={{ flex:1 }}>
-                <p style={{ fontWeight:600, fontSize:14 }}>{item.product.name}</p>
+                <p style={{ fontWeight:700, fontSize:14 }}>{item.product.name}</p>
                 <p style={{ fontSize:12, color:T.muted, marginTop:2 }}>{item.color} · Talla {item.size}</p>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:10 }}>
-                  {/* Qty controls */}
-                  <div style={{ display:"flex", alignItems:"center", gap:0, border:`1px solid ${T.borderL}`, borderRadius:8, overflow:"hidden" }}>
+                  <div style={{ display:"flex", alignItems:"center", border:`1px solid ${T.borderL}`, borderRadius:8, overflow:"hidden" }}>
                     <button className="qty-btn" onClick={() => item.qty>1 ? updateQty(item.key, item.qty-1) : removeFromCart(item.key)}
-                      style={{ width:30, height:30, fontSize:16, color:T.muted }}>−</button>
-                    <span style={{ width:28, textAlign:"center", fontSize:14, fontWeight:600 }}>{item.qty}</span>
+                      style={{ width:30, height:30, fontSize:16, color:T.muted, transition:"background 0.15s" }}>−</button>
+                    <span style={{ width:28, textAlign:"center", fontWeight:700, fontSize:14 }}>{item.qty}</span>
                     <button className="qty-btn" onClick={() => updateQty(item.key, item.qty+1)}
-                      style={{ width:30, height:30, fontSize:16, color:T.muted }}>+</button>
+                      style={{ width:30, height:30, fontSize:16, color:T.muted, transition:"background 0.15s" }}>+</button>
                   </div>
-                  <span style={{ fontWeight:700, fontSize:15 }}>{formatPrice(item.product.price * item.qty)}</span>
+                  <span style={{ fontWeight:800, fontSize:15 }}>{fmt(item.product.price * item.qty)}</span>
                 </div>
               </div>
-              <button onClick={() => removeFromCart(item.key)} style={{ alignSelf:"flex-start", padding:4, color:T.stone, borderRadius:6 }}>
+              <button onClick={() => removeFromCart(item.key)} style={{ alignSelf:"flex-start", padding:4, color:T.stone }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
@@ -565,28 +442,17 @@ function CartDrawer() {
         </div>
 
         {/* Footer */}
-        {!checkoutDone && items.length > 0 && (
+        {!done && items.length > 0 && (
           <div style={{ padding:"20px 24px", borderTop:`1px solid ${T.borderL}` }}>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-              <span style={{ color:T.muted, fontSize:14 }}>Subtotal</span>
-              <span style={{ fontWeight:600 }}>{formatPrice(total)}</span>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:16, paddingTop:4 }}>
+              <span style={{ fontWeight:800, fontSize:17 }}>Total</span>
+              <span style={{ fontWeight:900, fontSize:20 }}>{fmt(total)}</span>
             </div>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-              <span style={{ color:T.muted, fontSize:14 }}>Envío</span>
-              <span style={{ color:T.success, fontSize:14, fontWeight:600 }}>{total >= 39990 ? "GRATIS" : formatPrice(3990)}</span>
-            </div>
-            {total < 39990 && (
-              <p style={{ fontSize:12, color:T.muted, marginBottom:8 }}>Agrega {formatPrice(39990 - total)} más para envío gratis</p>
-            )}
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:20, paddingTop:12, borderTop:`1px solid ${T.borderL}` }}>
-              <span style={{ fontWeight:700, fontSize:16 }}>Total</span>
-              <span style={{ fontWeight:800, fontSize:18, color:T.accent }}>{formatPrice(total + (total >= 39990 ? 0 : 3990))}</span>
-            </div>
-            <button className="btn-primary" onClick={handleCheckout}
-              style={{ width:"100%", padding:"15px", background:T.accent, color:T.white, borderRadius:10, fontSize:15, fontWeight:700, letterSpacing:0.5 }}>
-              Ir al Checkout →
+            <button className="btn-lime" onClick={handleCheckout}
+              style={{ width:"100%", padding:"15px", background:T.lime, color:T.black, borderRadius:10, fontSize:15, fontWeight:800, letterSpacing:1 }}>
+              CONFIRMAR PEDIDO →
             </button>
-            <p style={{ textAlign:"center", fontSize:11, color:T.muted, marginTop:10 }}>🔒 Pago seguro · Devolución 30 días</p>
+            <p style={{ textAlign:"center", fontSize:11, color:T.muted, marginTop:10 }}>Te contactamos para coordinar pago y despacho</p>
           </div>
         )}
       </div>
@@ -599,38 +465,38 @@ function CartDrawer() {
 // ─────────────────────────────────────────────
 function ProductCard({ product, onSelect }) {
   const [hovColor, setHovColor] = useState(null);
+  const colorMap = product.type === "Buzo" ? BUZO_COLORS_MAP : COLORS_MAP;
+
   return (
-    <div className="product-card" style={{ background:T.white, borderRadius:16, overflow:"hidden", cursor:"pointer", border:`1px solid ${T.borderL}` }}
-      onClick={() => onSelect(product)}>
+    <div className="product-card" onClick={() => onSelect(product)}
+      style={{ background:T.white, borderRadius:16, overflow:"hidden", cursor:"pointer", border:`1px solid ${T.borderL}` }}>
       <div style={{ overflow:"hidden", position:"relative" }}>
         <div className="card-img">
-          <ProductVisual product={product} color={hovColor} />
+          <ProductVisual product={product} color={hovColor}/>
         </div>
         {product.tag && (
-          <span className={product.tag==="nuevo" ? "badge-new" : "badge-sale"}
-            style={{ position:"absolute", top:12, left:12, padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:700, letterSpacing:0.5, textTransform:"uppercase" }}>
-            {product.tag === "nuevo" ? "Nuevo" : "Sale"}
+          <span style={{ position:"absolute", top:12, left:12, background:T.lime, color:T.black, padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase" }}>
+            Nuevo
+          </span>
+        )}
+        {product.promoPrice && (
+          <span style={{ position:"absolute", top:12, right:12, background:T.black, color:T.lime, padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:800, letterSpacing:0.5 }}>
+            2x {fmt(product.promoPrice)}
           </span>
         )}
       </div>
-      <div style={{ padding:"14px 16px 18px" }}>
-        <p style={{ fontSize:11, color:T.muted, letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>{product.category}</p>
-        <h3 style={{ fontFamily:FONT.display, fontSize:17, fontWeight:700, marginBottom:6 }}>{product.name}</h3>
-        <StarRating rating={product.rating} reviews={product.reviews}/>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:12 }}>
-          <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
-            <span style={{ fontSize:17, fontWeight:800 }}>{formatPrice(product.price)}</span>
-            {product.originalPrice && <span style={{ fontSize:13, color:T.muted, textDecoration:"line-through" }}>{formatPrice(product.originalPrice)}</span>}
-          </div>
-          {/* Color swatches mini */}
-          <div style={{ display:"flex", gap:5 }}>
-            {product.colors.slice(0,4).map(c => (
-              <div key={c} className={`color-swatch`}
-                onMouseEnter={() => setHovColor(c)} onMouseLeave={() => setHovColor(null)}
-                style={{ width:14, height:14, borderRadius:"50%", background: COLORS_MAP[c]||"#ccc", border:`1px solid rgba(0,0,0,0.12)`, cursor:"pointer" }}
+      <div style={{ padding:"16px 18px 20px" }}>
+        <p style={{ fontSize:11, color:T.muted, letterSpacing:2, textTransform:"uppercase", marginBottom:4, fontWeight:600 }}>{product.type}</p>
+        <h3 style={{ fontFamily:FONT.display, fontSize:20, letterSpacing:2, marginBottom:12 }}>{product.name.toUpperCase()}</h3>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:18, fontWeight:800 }}>{fmt(product.price)}</span>
+          <div style={{ display:"flex", gap:6 }}>
+            {product.colors.map(c => (
+              <div key={c} onMouseEnter={() => setHovColor(c)} onMouseLeave={() => setHovColor(null)}
+                className="color-swatch"
+                style={{ width:16, height:16, borderRadius:"50%", background: colorMap[c]||"#ccc", border:"1.5px solid rgba(0,0,0,0.15)", cursor:"pointer" }}
                 title={c}/>
             ))}
-            {product.colors.length > 4 && <span style={{ fontSize:10, color:T.muted, alignSelf:"center" }}>+{product.colors.length-4}</span>}
           </div>
         </div>
       </div>
@@ -642,122 +508,118 @@ function ProductCard({ product, onSelect }) {
 // HOME PAGE
 // ─────────────────────────────────────────────
 function HomePage({ setPage, setSelectedProduct }) {
-  const categories = [
-    { name:"Básicas", emoji:"🤍", desc:"El esencial perfecto" },
-    { name:"Premium", emoji:"✨", desc:"Calidad sin concesiones" },
-    { name:"Gráficas", emoji:"🎨", desc:"Diseño que habla" },
-  ];
+  const marqueeText = "POLERAS OVERSIZE · BUZOS BAGGY · HECHO PARA ENTRENAR · VISTE MACIZO · CÓMODO · MACIZOS · ";
 
   return (
     <div>
-      {/* Hero */}
-      <section style={{ minHeight:"100vh", background:`linear-gradient(160deg, ${T.dark} 0%, #2C1810 100%)`, display:"flex", alignItems:"center", justifyContent:"center", padding:"100px 5% 60px", position:"relative", overflow:"hidden" }}>
-        {/* Background texture */}
-        <div style={{ position:"absolute", inset:0, backgroundImage:`radial-gradient(circle at 20% 80%, ${T.accent}22 0%, transparent 50%), radial-gradient(circle at 80% 20%, #C8A46A22 0%, transparent 50%)` }}/>
+      {/* HERO */}
+      <section style={{ minHeight:"100vh", background:T.darker, display:"flex", alignItems:"center", padding:"100px 5% 60px", position:"relative", overflow:"hidden" }}>
+        {/* BG texture */}
+        <div style={{ position:"absolute", inset:0, backgroundImage:`radial-gradient(ellipse at 70% 50%, rgba(200,240,74,0.07) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(200,240,74,0.04) 0%, transparent 50%)` }}/>
+        {/* Big background text */}
+        <div style={{ position:"absolute", right:"-2%", top:"50%", transform:"translateY(-50%)", fontFamily:FONT.display, fontSize:"clamp(120px, 18vw, 220px)", color:"rgba(255,255,255,0.03)", letterSpacing:10, pointerEvents:"none", lineHeight:1, userSelect:"none" }}>
+          MOVE
+        </div>
 
-        <div style={{ maxWidth:720, textAlign:"center", position:"relative" }} className="fade-up">
-          <span style={{ fontSize:13, letterSpacing:4, textTransform:"uppercase", color:T.accentL, fontWeight:600, display:"block", marginBottom:24 }}>
-            Poleras de Autor · Santiago, Chile
-          </span>
-          <h1 style={{ fontFamily:FONT.display, fontSize:"clamp(44px, 7vw, 82px)", fontWeight:700, color:T.white, lineHeight:1.05, marginBottom:28 }}>
-            Viste con<br/><em style={{ color:T.accentL, fontStyle:"italic" }}>propósito.</em>
-          </h1>
-          <p style={{ fontSize:18, color:"rgba(255,255,255,0.65)", lineHeight:1.7, maxWidth:520, margin:"0 auto 40px" }}>
-            Poleras de calidad premium, confeccionadas en Chile. Diseños que duran, materiales que se sienten. Desde $21.990.
-          </p>
-          <div style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap" }}>
-            <button className="btn-primary" onClick={() => setPage("store")}
-              style={{ padding:"15px 36px", background:T.accent, color:T.white, borderRadius:10, fontSize:15, fontWeight:700, letterSpacing:0.5 }}>
-              Ver Colección →
-            </button>
-            <button className="btn-outline" onClick={() => setPage("about")}
-              style={{ padding:"15px 36px", border:`1.5px solid rgba(255,255,255,0.3)`, color:T.white, borderRadius:10, fontSize:15, fontWeight:500 }}>
-              Nuestra Historia
-            </button>
-          </div>
-          <div style={{ marginTop:48, display:"flex", justifyContent:"center", gap:32, flexWrap:"wrap" }}>
-            {[["500+","Clientes felices"],["100%","Algodón natural"],["30 días","Devolución gratis"]].map(([n,l]) => (
-              <div key={n} style={{ textAlign:"center" }}>
-                <div style={{ fontFamily:FONT.display, fontSize:26, fontWeight:700, color:T.white }}>{n}</div>
-                <div style={{ fontSize:12, color:"rgba(255,255,255,0.5)", marginTop:2 }}>{l}</div>
-              </div>
-            ))}
+        <div style={{ maxWidth:1280, margin:"0 auto", width:"100%", position:"relative" }}>
+          <div style={{ maxWidth:680 }} className="fade-up">
+            <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(200,240,74,0.1)", border:"1px solid rgba(200,240,74,0.2)", borderRadius:20, padding:"6px 16px", marginBottom:28 }}>
+              <span style={{ width:7, height:7, borderRadius:"50%", background:T.lime, display:"inline-block" }}/>
+              <span style={{ fontSize:12, color:T.lime, fontWeight:700, letterSpacing:2, textTransform:"uppercase" }}>Santiago, Chile · Nuevos Productos</span>
+            </div>
+
+            <h1 style={{ fontFamily:FONT.display, fontSize:"clamp(52px, 9vw, 110px)", color:T.white, lineHeight:0.95, letterSpacing:3, marginBottom:28 }}>
+              VISTE<br/>
+              <span style={{ color:T.lime }}>MACIZO.</span><br/>
+              ENTRENA<br/>
+              <span style={{ fontFamily:"'Playfair Display', serif", fontStyle:"italic", fontSize:"clamp(40px,7vw,88px)", color:"rgba(255,255,255,0.5)", letterSpacing:0, fontWeight:400 }}>bien.</span>
+            </h1>
+
+            <p style={{ fontSize:17, color:"rgba(255,255,255,0.55)", lineHeight:1.75, maxWidth:480, marginBottom:40 }}>
+              Ropa para entrenar, viste bien, viste macizo 😎. Porque sentirte cómodo también es importante, pero si te puedes ver bien y macizo — este es tu lugar.
+            </p>
+
+            <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
+              <button className="btn-lime" onClick={() => setPage("store")}
+                style={{ padding:"16px 40px", background:T.lime, color:T.black, borderRadius:10, fontSize:15, fontWeight:800, letterSpacing:1 }}>
+                VER COLECCIÓN →
+              </button>
+              <button className="btn-outline-w" onClick={() => setPage("about")}
+                style={{ padding:"16px 36px", border:"1.5px solid rgba(255,255,255,0.2)", color:T.white, borderRadius:10, fontSize:15, fontWeight:600 }}>
+                Nuestra Historia
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Categories */}
+      {/* MARQUEE */}
+      <div style={{ background:T.lime, padding:"14px 0", overflow:"hidden" }}>
+        <div className="marquee-track">
+          {[...Array(4)].map((_,i) => (
+            <span key={i} style={{ fontFamily:FONT.display, fontSize:16, letterSpacing:3, color:T.black, paddingRight:0 }}>
+              {marqueeText}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* PRODUCTS */}
       <section style={{ padding:"80px 5%", background:T.offWhite }}>
         <div style={{ maxWidth:1280, margin:"0 auto" }}>
-          <h2 style={{ fontFamily:FONT.display, fontSize:36, fontWeight:700, marginBottom:8, textAlign:"center" }}>Nuestras Líneas</h2>
-          <p style={{ color:T.muted, textAlign:"center", marginBottom:48, fontSize:15 }}>Tres categorías, un mismo estándar de calidad.</p>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:24 }}>
-            {categories.map((c, i) => (
-              <button key={c.name} onClick={() => setPage("store")}
-                style={{ background:i===1?T.dark:T.white, border:`1px solid ${T.borderL}`, borderRadius:20, padding:"40px 32px", textAlign:"left", cursor:"pointer", transition:"transform 0.25s, box-shadow 0.25s", animationDelay:`${i*0.1}s` }}
-                className="product-card fade-up">
-                <span style={{ fontSize:44, display:"block", marginBottom:16 }}>{c.emoji}</span>
-                <h3 style={{ fontFamily:FONT.display, fontSize:24, fontWeight:700, color:i===1?T.white:T.black, marginBottom:6 }}>{c.name}</h3>
-                <p style={{ fontSize:14, color:i===1?"rgba(255,255,255,0.55)":T.muted, marginBottom:20 }}>{c.desc}</p>
-                <span style={{ fontSize:13, fontWeight:700, color:i===1?T.accentL:T.accent, letterSpacing:0.5 }}>Explorar →</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured products */}
-      <section style={{ padding:"80px 5%", background:T.white }}>
-        <div style={{ maxWidth:1280, margin:"0 auto" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:40, flexWrap:"wrap", gap:16 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:48, flexWrap:"wrap", gap:16 }}>
             <div>
-              <h2 style={{ fontFamily:FONT.display, fontSize:36, fontWeight:700 }}>Destacados</h2>
-              <p style={{ color:T.muted, marginTop:6 }}>Lo más nuevo y lo más amado.</p>
+              <p style={{ fontSize:12, color:T.muted, letterSpacing:3, textTransform:"uppercase", fontWeight:700, marginBottom:8 }}>Colección</p>
+              <h2 style={{ fontFamily:FONT.display, fontSize:"clamp(32px,5vw,52px)", letterSpacing:3, lineHeight:1 }}>NUESTROS<br/>PRODUCTOS</h2>
             </div>
-            <button className="btn-outline" onClick={() => setPage("store")}
-              style={{ padding:"11px 24px", border:`1.5px solid ${T.black}`, borderRadius:8, fontSize:14, fontWeight:600 }}>
-              Ver todo
+            <button className="btn-dark" onClick={() => setPage("store")}
+              style={{ padding:"12px 28px", background:T.black, color:T.white, borderRadius:8, fontSize:13, fontWeight:700, letterSpacing:1.5 }}>
+              VER TODO
             </button>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:24 }}>
-            {MOCK_PRODUCTS.filter(p => p.tag === "nuevo").slice(0,4).map(p => (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:24 }}>
+            {MOCK_PRODUCTS.map(p => (
               <ProductCard key={p.id} product={p} onSelect={prod => { setSelectedProduct(prod); setPage("product"); }}/>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Banner CTA */}
-      <section style={{ padding:"80px 5%", background:`linear-gradient(135deg, ${T.accent}, ${T.accentD})` }}>
-        <div style={{ maxWidth:700, margin:"0 auto", textAlign:"center" }}>
-          <h2 style={{ fontFamily:FONT.display, fontSize:38, fontWeight:700, color:T.white, marginBottom:16 }}>Envío gratis sobre $39.990</h2>
-          <p style={{ color:"rgba(255,255,255,0.8)", fontSize:16, marginBottom:32 }}>A todo Chile. Despacho en 2–4 días hábiles. Devolución gratuita en 30 días.</p>
-          <button className="btn-outline" onClick={() => setPage("store")}
-            style={{ padding:"15px 40px", border:`2px solid white`, color:T.white, borderRadius:10, fontSize:16, fontWeight:700, letterSpacing:0.5 }}>
-            Comprar Ahora
-          </button>
+      {/* PROMO 2x1 */}
+      <section style={{ padding:"80px 5%", background:T.dark }}>
+        <div style={{ maxWidth:900, margin:"0 auto" }}>
+          <div className="promo-card" style={{ background:`linear-gradient(135deg, ${T.lime} 0%, #a8cc30 100%)`, borderRadius:24, padding:"48px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:24 }}>
+            <div>
+              <p style={{ fontSize:12, fontWeight:800, letterSpacing:3, color:"rgba(0,0,0,0.5)", marginBottom:8 }}>PROMO ESPECIAL</p>
+              <h2 style={{ fontFamily:FONT.display, fontSize:"clamp(36px,5vw,60px)", letterSpacing:3, color:T.black, lineHeight:1, marginBottom:12 }}>
+                2 POLERAS<br/>POR $18.990
+              </h2>
+              <p style={{ fontSize:15, color:"rgba(0,0,0,0.6)", maxWidth:360 }}>
+                Elige cualquier combinación de colores. Ahorra $4.990 llevándote el par.
+              </p>
+            </div>
+            <button className="btn-dark" onClick={() => setPage("store")}
+              style={{ padding:"18px 40px", background:T.black, color:T.lime, borderRadius:12, fontSize:16, fontWeight:800, letterSpacing:1.5, flexShrink:0 }}>
+              APROVECHAR →
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* Social proof */}
-      <section style={{ padding:"80px 5%", background:T.offWhite }}>
-        <div style={{ maxWidth:1280, margin:"0 auto", textAlign:"center" }}>
-          <h2 style={{ fontFamily:FONT.display, fontSize:32, fontWeight:700, marginBottom:48 }}>Lo que dicen nuestros clientes</h2>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap:24 }}>
+      {/* VALUES */}
+      <section style={{ padding:"80px 5%", background:T.white }}>
+        <div style={{ maxWidth:1280, margin:"0 auto" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))", gap:2 }}>
             {[
-              { name:"Catalina M.", loc:"Santiago", text:"La calidad es increíble. La lavé 20 veces y sigue igual. No vuelvo a comprar poleras en otro lugar.", rating:5, prod:"Esencial Clásica" },
-              { name:"Rodrigo S.", loc:"Valparaíso", text:"El oversized es perfecto. No es esa típica talla grande disfrazada de oversized, es realmente bien cortada.", rating:5, prod:"Oversized Statement" },
-              { name:"Valentina K.", loc:"Concepción", text:"Llegó en 3 días, el empaque es hermoso. Regale una y mi amiga ya quiere pedirse otras.", rating:5, prod:"Vintage Washed" },
-            ].map((r,i) => (
-              <div key={i} style={{ background:T.white, border:`1px solid ${T.borderL}`, borderRadius:16, padding:"28px 24px", textAlign:"left" }}>
-                <div style={{ display:"flex", marginBottom:12 }}>
-                  {[1,2,3,4,5].map(s => <span key={s} style={{ color:"#E8A020", fontSize:14 }}>★</span>)}
-                </div>
-                <p style={{ fontSize:15, lineHeight:1.65, color:T.dark, marginBottom:16 }}>"{r.text}"</p>
-                <div>
-                  <p style={{ fontWeight:700, fontSize:14 }}>{r.name}</p>
-                  <p style={{ fontSize:12, color:T.muted }}>{r.loc} · compró {r.prod}</p>
-                </div>
+              { icon:"💪", title:"Para entrenar", desc:"Diseñadas para moverse, agacharse, levantar. Sin que se vean mal haciéndolo." },
+              { icon:"🎯", title:"Para todos", desc:"No importa si llevas 1 mes o 5 años en el gym. Estas poleras te quedan bien." },
+              { icon:"🖤", title:"Diseño limpio", desc:"Sin logos enormes ni gráficas raras. Minimalista, estético y atemporal." },
+              { icon:"✅", title:"Calidad real", desc:"Tela heavyweight que se siente premium desde el primer uso." },
+            ].map((v,i) => (
+              <div key={i} style={{ padding:"36px 28px", borderLeft: i>0 ? `1px solid ${T.borderL}` : "none" }}>
+                <span style={{ fontSize:36, display:"block", marginBottom:16 }}>{v.icon}</span>
+                <h3 style={{ fontFamily:FONT.display, fontSize:18, letterSpacing:2, marginBottom:10 }}>{v.title.toUpperCase()}</h3>
+                <p style={{ fontSize:14, color:T.muted, lineHeight:1.7 }}>{v.desc}</p>
               </div>
             ))}
           </div>
@@ -771,117 +633,73 @@ function HomePage({ setPage, setSelectedProduct }) {
 // STORE PAGE
 // ─────────────────────────────────────────────
 function StorePage({ setPage, setSelectedProduct }) {
-  const [catFilter, setCatFilter] = useState("Todas");
+  const [catFilter, setCatFilter] = useState("Todos");
   const [sizeFilter, setSizeFilter] = useState(null);
-  const [priceFilter, setPriceFilter] = useState(0);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("featured");
 
   const filtered = MOCK_PRODUCTS
-    .filter(p => catFilter === "Todas" || p.category === catFilter)
-    .filter(p => !sizeFilter || p.sizes.includes(sizeFilter))
-    .filter(p => p.price >= PRICE_RANGES[priceFilter].min && p.price <= PRICE_RANGES[priceFilter].max)
-    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase()))
-    .sort((a,b) => {
-      if (sort === "price-asc") return a.price - b.price;
-      if (sort === "price-desc") return b.price - a.price;
-      if (sort === "rating") return b.rating - a.rating;
-      return 0;
-    });
+    .filter(p => catFilter === "Todos" || p.type === catFilter)
+    .filter(p => !sizeFilter || p.sizes.includes(sizeFilter));
 
   return (
-    <div style={{ paddingTop:80 }}>
-      {/* Header */}
-      <div style={{ background:T.dark, padding:"48px 5% 40px", textAlign:"center" }}>
-        <h1 style={{ fontFamily:FONT.display, fontSize:42, fontWeight:700, color:T.white, marginBottom:8 }}>Nuestra Tienda</h1>
-        <p style={{ color:"rgba(255,255,255,0.55)", fontSize:15 }}>{MOCK_PRODUCTS.length} productos · Envío gratis sobre $39.990</p>
+    <div style={{ paddingTop:68 }}>
+      <div style={{ background:T.dark, padding:"56px 5% 48px", position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", right:"-1%", top:"50%", transform:"translateY(-50%)", fontFamily:FONT.display, fontSize:"clamp(80px,14vw,160px)", color:"rgba(255,255,255,0.03)", letterSpacing:8, pointerEvents:"none" }}>TIENDA</div>
+        <div style={{ maxWidth:1280, margin:"0 auto", position:"relative" }}>
+          <p style={{ fontSize:12, color:T.lime, letterSpacing:3, textTransform:"uppercase", fontWeight:700, marginBottom:10 }}>Colección Actual</p>
+          <h1 style={{ fontFamily:FONT.display, fontSize:"clamp(36px,6vw,72px)", color:T.white, letterSpacing:4 }}>NUESTRA TIENDA</h1>
+        </div>
       </div>
 
-      <div style={{ maxWidth:1280, margin:"0 auto", padding:"32px 5%" }}>
-        {/* Search + Sort */}
-        <div style={{ display:"flex", gap:12, marginBottom:28, flexWrap:"wrap" }}>
-          <div style={{ flex:1, minWidth:240, position:"relative" }}>
-            <svg style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={T.stone} strokeWidth={2}>
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-            <input className="search-input" placeholder="Buscar poleras..."
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ width:"100%", padding:"11px 12px 11px 38px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14, background:T.white, color:T.black }}/>
-          </div>
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            style={{ padding:"11px 16px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14, background:T.white, color:T.black, cursor:"pointer" }}>
-            <option value="featured">Destacados</option>
-            <option value="price-asc">Precio: menor a mayor</option>
-            <option value="price-desc">Precio: mayor a menor</option>
-            <option value="rating">Mejor valorados</option>
-          </select>
-        </div>
-
+      <div style={{ maxWidth:1280, margin:"0 auto", padding:"36px 5%" }}>
         {/* Filters */}
-        <div style={{ display:"flex", gap:20, marginBottom:32, flexWrap:"wrap" }}>
-          {/* Category */}
+        <div style={{ display:"flex", gap:24, marginBottom:36, flexWrap:"wrap", alignItems:"flex-end" }}>
           <div>
-            <p style={{ fontSize:12, fontWeight:600, color:T.muted, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>Categoría</p>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            <p style={{ fontSize:11, fontWeight:700, color:T.muted, letterSpacing:2, textTransform:"uppercase", marginBottom:10 }}>Producto</p>
+            <div style={{ display:"flex", gap:8 }}>
               {CATEGORIES.map(c => (
                 <button key={c} className={`filter-pill ${catFilter===c?"active-pill":""}`} onClick={() => setCatFilter(c)}
-                  style={{ padding:"7px 16px", border:`1.5px solid ${catFilter===c?T.accent:T.borderL}`, borderRadius:20, fontSize:13, fontWeight:500, background: catFilter===c?T.accent:T.white, color: catFilter===c?T.white:T.black }}>
+                  style={{ padding:"8px 20px", border:`1.5px solid ${catFilter===c?T.black:T.borderL}`, borderRadius:8, fontSize:13, fontWeight:600, background: catFilter===c?T.black:T.white, color: catFilter===c?T.white:T.black, letterSpacing:0.5 }}>
                   {c}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Size */}
           <div>
-            <p style={{ fontSize:12, fontWeight:600, color:T.muted, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>Talla</p>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            <p style={{ fontSize:11, fontWeight:700, color:T.muted, letterSpacing:2, textTransform:"uppercase", marginBottom:10 }}>Talla</p>
+            <div style={{ display:"flex", gap:6 }}>
               {SIZES_ALL.map(s => (
                 <button key={s} className={`filter-pill ${sizeFilter===s?"active-pill":""}`} onClick={() => setSizeFilter(sizeFilter===s?null:s)}
-                  style={{ width:42, height:38, border:`1.5px solid ${sizeFilter===s?T.accent:T.borderL}`, borderRadius:8, fontSize:12, fontWeight:600, background: sizeFilter===s?T.accent:T.white, color: sizeFilter===s?T.white:T.black }}>
+                  style={{ width:44, height:40, border:`1.5px solid ${sizeFilter===s?T.black:T.borderL}`, borderRadius:8, fontSize:12, fontWeight:700, background: sizeFilter===s?T.black:T.white, color: sizeFilter===s?T.white:T.black }}>
                   {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Price */}
-          <div>
-            <p style={{ fontSize:12, fontWeight:600, color:T.muted, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>Precio</p>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              {PRICE_RANGES.map((r,i) => (
-                <button key={r.label} className={`filter-pill ${priceFilter===i?"active-pill":""}`} onClick={() => setPriceFilter(i)}
-                  style={{ padding:"7px 14px", border:`1.5px solid ${priceFilter===i?T.accent:T.borderL}`, borderRadius:20, fontSize:12, fontWeight:500, background: priceFilter===i?T.accent:T.white, color: priceFilter===i?T.white:T.black }}>
-                  {r.label}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Results count */}
-        <p style={{ color:T.muted, fontSize:14, marginBottom:24 }}>
-          {filtered.length} {filtered.length===1?"producto":"productos"} encontrados
-          {(catFilter!=="Todas"||sizeFilter||priceFilter>0||search) && (
-            <button onClick={() => { setCatFilter("Todas"); setSizeFilter(null); setPriceFilter(0); setSearch(""); }}
-              style={{ marginLeft:12, color:T.accent, fontWeight:600, fontSize:14 }}>
-              × Limpiar filtros
-            </button>
-          )}
-        </p>
+        {/* Promo Banner inline */}
+        <div style={{ background:T.lime, borderRadius:14, padding:"20px 28px", marginBottom:36, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <span style={{ fontSize:28 }}>🔥</span>
+            <div>
+              <p style={{ fontFamily:FONT.display, fontSize:18, letterSpacing:2, color:T.black }}>PROMO: 2 POLERAS POR $18.990</p>
+              <p style={{ fontSize:13, color:"rgba(0,0,0,0.55)", marginTop:2 }}>Ahorra $4.990 · cualquier color</p>
+            </div>
+          </div>
+          <span style={{ fontSize:13, fontWeight:800, color:T.black, letterSpacing:1 }}>ACTIVO ✓</span>
+        </div>
 
         {/* Grid */}
-        {filtered.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"60px 20px", color:T.muted }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:24 }} className="fade-in">
+          {filtered.map(p => (
+            <ProductCard key={p.id} product={p} onSelect={prod => { setSelectedProduct(prod); setPage("product"); }}/>
+          ))}
+        </div>
+
+        {filtered.length === 0 && (
+          <div style={{ textAlign:"center", padding:"60px", color:T.muted }}>
             <div style={{ fontSize:48, marginBottom:16 }}>🔍</div>
-            <p style={{ fontFamily:FONT.display, fontSize:20 }}>No encontramos resultados</p>
-            <p style={{ fontSize:14, marginTop:8 }}>Intenta ajustando los filtros</p>
-          </div>
-        ) : (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:24 }} className="fade-in">
-            {filtered.map(p => (
-              <ProductCard key={p.id} product={p} onSelect={prod => { setSelectedProduct(prod); setPage("product"); }}/>
-            ))}
+            <p style={{ fontFamily:FONT.display, fontSize:22, letterSpacing:2 }}>SIN RESULTADOS</p>
           </div>
         )}
       </div>
@@ -890,10 +708,11 @@ function StorePage({ setPage, setSelectedProduct }) {
 }
 
 // ─────────────────────────────────────────────
-// PRODUCT DETAIL PAGE
+// PRODUCT DETAIL
 // ─────────────────────────────────────────────
 function ProductDetailPage({ product, setPage }) {
   const { addToCart } = useContext(CartContext);
+  const colorMap = product.type === "Buzo" ? BUZO_COLORS_MAP : COLORS_MAP;
   const [selColor, setSelColor] = useState(product.colors[0]);
   const [selSize, setSelSize] = useState(null);
   const [qty, setQty] = useState(1);
@@ -905,83 +724,77 @@ function ProductDetailPage({ product, setPage }) {
     setSizeError(false);
     addToCart(product, selColor, selSize, qty);
     setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    setTimeout(() => setAdded(false), 2200);
   };
 
-  const discount = product.originalPrice ? Math.round((1 - product.price/product.originalPrice)*100) : null;
-
   return (
-    <div style={{ paddingTop:80, background:T.white, minHeight:"100vh" }}>
+    <div style={{ paddingTop:68, background:T.white, minHeight:"100vh" }}>
       <div style={{ maxWidth:1200, margin:"0 auto", padding:"40px 5%" }}>
+
         {/* Breadcrumb */}
-        <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:32, fontSize:13, color:T.muted }}>
+        <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:36, fontSize:12, color:T.muted, letterSpacing:1, textTransform:"uppercase", fontWeight:600 }}>
           <button onClick={() => setPage("home")} style={{ color:T.muted }}>Inicio</button>
           <span>/</span>
           <button onClick={() => setPage("store")} style={{ color:T.muted }}>Tienda</button>
           <span>/</span>
-          <span style={{ color:T.black, fontWeight:600 }}>{product.name}</span>
+          <span style={{ color:T.black }}>{product.name}</span>
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:60 }} className="fade-in">
-          {/* Left: Images */}
+        <div className="two-col" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:64 }} >
+          {/* Visual */}
           <div>
             <div style={{ borderRadius:20, overflow:"hidden", border:`1px solid ${T.borderL}` }}>
               <ProductVisual product={product} color={selColor}/>
             </div>
-            {/* Thumb colors */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10, marginTop:12 }}>
+            <div style={{ display:"grid", gridTemplateColumns:`repeat(${product.colors.length}, 1fr)`, gap:10, marginTop:12 }}>
               {product.colors.map(c => (
                 <button key={c} onClick={() => setSelColor(c)}
-                  style={{ borderRadius:10, overflow:"hidden", border:`2px solid ${selColor===c?T.accent:T.borderL}`, aspectRatio:"1", display:"flex", alignItems:"center", justifyContent:"center", background: COLORS_MAP[c]||"#eee", transition:"border-color 0.2s" }}>
-                  <span style={{ fontSize:20 }}>{product.emoji}</span>
+                  style={{ borderRadius:10, overflow:"hidden", border:`2px solid ${selColor===c?T.black:T.borderL}`, aspectRatio:"1", background: colorMap[c], display:"flex", alignItems:"center", justifyContent:"center", transition:"border-color 0.2s" }}>
+                  <span style={{ fontSize:22 }}>{product.emoji}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Right: Info */}
-          <div>
-            <span style={{ fontSize:12, color:T.muted, letterSpacing:1.5, textTransform:"uppercase", fontWeight:600 }}>{product.category}</span>
-            <h1 style={{ fontFamily:FONT.display, fontSize:36, fontWeight:700, marginTop:8, marginBottom:10, lineHeight:1.1 }}>{product.name}</h1>
-            <StarRating rating={product.rating} reviews={product.reviews}/>
+          {/* Info */}
+          <div className="fade-in">
+            <span style={{ fontSize:11, color:T.muted, letterSpacing:3, textTransform:"uppercase", fontWeight:700 }}>{product.type}</span>
+            <h1 style={{ fontFamily:FONT.display, fontSize:"clamp(32px,4vw,52px)", letterSpacing:4, marginTop:8, marginBottom:20, lineHeight:1 }}>{product.name.toUpperCase()}</h1>
 
-            <div style={{ display:"flex", alignItems:"baseline", gap:12, marginTop:20, marginBottom:24 }}>
-              <span style={{ fontFamily:FONT.display, fontSize:32, fontWeight:800 }}>{formatPrice(product.price)}</span>
-              {product.originalPrice && (
-                <>
-                  <span style={{ fontSize:18, color:T.muted, textDecoration:"line-through" }}>{formatPrice(product.originalPrice)}</span>
-                  <span style={{ background:T.accent, color:T.white, borderRadius:6, padding:"3px 10px", fontSize:13, fontWeight:700 }}>−{discount}%</span>
-                </>
+            <div style={{ display:"flex", alignItems:"baseline", gap:16, marginBottom:24 }}>
+              <span style={{ fontSize:34, fontWeight:900 }}>{fmt(product.price)}</span>
+              {product.promoPrice && (
+                <span style={{ background:T.lime, color:T.black, borderRadius:8, padding:"4px 14px", fontSize:14, fontWeight:800 }}>
+                  2x {fmt(product.promoPrice)}
+                </span>
               )}
             </div>
 
-            {/* Description */}
-            <p style={{ fontSize:15, lineHeight:1.75, color:"#444", marginBottom:28 }}>{product.description}</p>
+            <p style={{ fontSize:15, lineHeight:1.8, color:"#555", marginBottom:28 }}>{product.description}</p>
 
-            {/* Color selector */}
+            {/* Color */}
             <div style={{ marginBottom:24 }}>
-              <p style={{ fontSize:13, fontWeight:700, marginBottom:10, letterSpacing:0.5 }}>
-                COLOR: <span style={{ color:T.accent }}>{selColor}</span>
+              <p style={{ fontSize:12, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", marginBottom:12 }}>
+                Color: <span style={{ color:T.muted, fontWeight:400, textTransform:"none", letterSpacing:0 }}>{selColor}</span>
               </p>
-              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", gap:12 }}>
                 {product.colors.map(c => (
                   <button key={c} className={`color-swatch ${selColor===c?"selected-color":""}`} onClick={() => setSelColor(c)}
-                    style={{ width:36, height:36, borderRadius:"50%", background: COLORS_MAP[c]||"#ccc", border:`1.5px solid rgba(0,0,0,0.12)`, cursor:"pointer" }}
+                    style={{ width:38, height:38, borderRadius:"50%", background: colorMap[c]||"#ccc", border:"1.5px solid rgba(0,0,0,0.12)" }}
                     title={c}/>
                 ))}
               </div>
             </div>
 
-            {/* Size selector */}
+            {/* Size */}
             <div style={{ marginBottom:28 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
-                <p style={{ fontSize:13, fontWeight:700, letterSpacing:0.5 }}>TALLA {sizeError && <span style={{ color:"#c0392b", fontSize:12, fontWeight:400 }}>— Por favor elige una talla</span>}</p>
-                <button style={{ fontSize:12, color:T.muted, textDecoration:"underline" }}>Guía de tallas</button>
-              </div>
+              <p style={{ fontSize:12, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", marginBottom:12 }}>
+                Talla {sizeError && <span style={{ color:"#c0392b", fontWeight:400, fontSize:11, textTransform:"none", letterSpacing:0 }}>— Elige una talla</span>}
+              </p>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {product.sizes.map(s => (
                   <button key={s} className={`size-btn ${selSize===s?"selected-size":""}`} onClick={() => { setSelSize(s); setSizeError(false); }}
-                    style={{ width:52, height:44, border:`1.5px solid ${selSize===s?T.black:sizeError?T.accent:T.borderL}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", background: selSize===s?T.black:T.white, color: selSize===s?T.white:T.black }}>
+                    style={{ width:52, height:46, border:`1.5px solid ${selSize===s?T.black:sizeError?T.stone:T.borderL}`, borderRadius:8, fontSize:13, fontWeight:700, background: selSize===s?T.black:T.white, color: selSize===s?T.white:T.black }}>
                     {s}
                   </button>
                 ))}
@@ -991,19 +804,19 @@ function ProductDetailPage({ product, setPage }) {
             {/* Qty + Add */}
             <div style={{ display:"flex", gap:12, marginBottom:20 }}>
               <div style={{ display:"flex", alignItems:"center", border:`1.5px solid ${T.borderL}`, borderRadius:10, overflow:"hidden" }}>
-                <button className="qty-btn" onClick={() => setQty(q => Math.max(1,q-1))} style={{ width:44, height:52, fontSize:18, color:T.muted }}>−</button>
-                <span style={{ width:44, textAlign:"center", fontWeight:700, fontSize:16 }}>{qty}</span>
-                <button className="qty-btn" onClick={() => setQty(q => q+1)} style={{ width:44, height:52, fontSize:18, color:T.muted }}>+</button>
+                <button className="qty-btn" onClick={() => setQty(q => Math.max(1,q-1))} style={{ width:44, height:52, fontSize:18, color:T.muted, transition:"background 0.15s" }}>−</button>
+                <span style={{ width:44, textAlign:"center", fontWeight:800, fontSize:16 }}>{qty}</span>
+                <button className="qty-btn" onClick={() => setQty(q => q+1)} style={{ width:44, height:52, fontSize:18, color:T.muted, transition:"background 0.15s" }}>+</button>
               </div>
-              <button className="btn-primary" onClick={handleAdd}
-                style={{ flex:1, padding:"0 24px", background: added?T.success:T.accent, color:T.white, borderRadius:10, fontSize:15, fontWeight:700, letterSpacing:0.3, transition:"background 0.3s" }}>
-                {added ? "✓ Agregado al carrito" : "Agregar al carrito"}
+              <button className="btn-lime" onClick={handleAdd}
+                style={{ flex:1, padding:"0 24px", background: added ? T.success : T.lime, color: added ? T.white : T.black, borderRadius:10, fontSize:14, fontWeight:800, letterSpacing:1, transition:"background 0.3s" }}>
+                {added ? "✓ AGREGADO" : "AGREGAR AL CARRITO"}
               </button>
             </div>
 
-            {/* Trust badges */}
-            <div style={{ display:"flex", gap:16, padding:"16px", background:T.offWhite, borderRadius:12, flexWrap:"wrap" }}>
-              {[["🚚","Envío gratis +$39.990"],["↩️","Cambios 30 días"],["✓","Calidad garantizada"]].map(([e,t]) => (
+            {/* Trust */}
+            <div style={{ display:"flex", gap:20, padding:"16px 20px", background:T.offWhite, borderRadius:12, flexWrap:"wrap" }}>
+              {[["🚚","Despacho a todo Chile"],["↩️","Cambios sin problema"],["✓","Calidad garantizada"]].map(([e,t]) => (
                 <div key={t} style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:T.muted }}>
                   <span>{e}</span><span>{t}</span>
                 </div>
@@ -1012,25 +825,15 @@ function ProductDetailPage({ product, setPage }) {
 
             {/* Details */}
             <div style={{ marginTop:28 }}>
-              <h3 style={{ fontSize:14, fontWeight:700, marginBottom:12, letterSpacing:0.5, textTransform:"uppercase" }}>Detalles del Producto</h3>
-              <ul style={{ listStyle:"none", display:"flex", flexDirection:"column", gap:6 }}>
+              <p style={{ fontSize:12, fontWeight:700, letterSpacing:2, textTransform:"uppercase", marginBottom:12 }}>Detalles</p>
+              <ul style={{ listStyle:"none", display:"flex", flexDirection:"column", gap:8 }}>
                 {product.details.map(d => (
-                  <li key={d} style={{ fontSize:14, color:"#555", display:"flex", alignItems:"center", gap:8 }}>
-                    <span style={{ color:T.accent, fontWeight:700 }}>—</span> {d}
+                  <li key={d} style={{ fontSize:14, color:"#555", display:"flex", alignItems:"flex-start", gap:10 }}>
+                    <span style={{ color:T.lime, fontWeight:900, marginTop:1 }}>—</span> {d}
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
-        </div>
-
-        {/* Related products */}
-        <div style={{ marginTop:72 }}>
-          <h2 style={{ fontFamily:FONT.display, fontSize:28, fontWeight:700, marginBottom:32 }}>También te puede gustar</h2>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:20 }}>
-            {MOCK_PRODUCTS.filter(p => p.id !== product.id && p.category === product.category).slice(0,4).map(p => (
-              <ProductCard key={p.id} product={p} onSelect={prod => { setPage("product"); window.scrollTo(0,0); }}/>
-            ))}
           </div>
         </div>
       </div>
@@ -1039,31 +842,55 @@ function ProductDetailPage({ product, setPage }) {
 }
 
 // ─────────────────────────────────────────────
-// ABOUT PAGE (simple)
+// ABOUT PAGE
 // ─────────────────────────────────────────────
 function AboutPage({ setPage }) {
   return (
-    <div style={{ paddingTop:80 }}>
-      <div style={{ background:T.dark, padding:"60px 5%", textAlign:"center" }}>
-        <h1 style={{ fontFamily:FONT.display, fontSize:48, color:T.white, marginBottom:12 }}>Nuestra <em style={{ color:T.accentL, fontStyle:"italic" }}>Historia</em></h1>
-        <p style={{ color:"rgba(255,255,255,0.55)", maxWidth:600, margin:"0 auto", fontSize:15, lineHeight:1.7 }}>
-          VESTE nació en Santiago con una idea simple: las poleras básicas no tenían por qué ser aburridas.
-        </p>
+    <div style={{ paddingTop:68 }}>
+      {/* Hero */}
+      <div style={{ background:T.dark, padding:"72px 5% 64px", position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", right:0, top:"50%", transform:"translateY(-50%)", fontFamily:FONT.display, fontSize:"clamp(80px,14vw,180px)", color:"rgba(255,255,255,0.03)", letterSpacing:8, pointerEvents:"none" }}>NOSOTROS</div>
+        <div style={{ maxWidth:1280, margin:"0 auto", position:"relative" }}>
+          <p style={{ fontSize:12, color:T.lime, letterSpacing:3, textTransform:"uppercase", fontWeight:700, marginBottom:12 }}>Nuestra historia</p>
+          <h1 style={{ fontFamily:FONT.display, fontSize:"clamp(42px,7vw,88px)", color:T.white, letterSpacing:4, lineHeight:1, marginBottom:20 }}>
+            POR QUÉ<br/>
+            <span style={{ color:T.lime }}>MACIZOS.</span>
+          </h1>
+          <p style={{ fontSize:17, color:"rgba(255,255,255,0.5)", maxWidth:580, lineHeight:1.8 }}>
+            Nació en un vestuario de gym. De querer verse bien entrenando sin importar el proceso en que estés.
+          </p>
+        </div>
       </div>
-      <div style={{ maxWidth:780, margin:"0 auto", padding:"60px 5%" }}>
+
+      {/* Content */}
+      <div style={{ maxWidth:860, margin:"0 auto", padding:"72px 5%" }}>
         {[
-          { title:"El origen", text:"Empezamos en 2022 frustrados con la calidad de las poleras chilenas. O eran caras y mal diseñadas, o baratas y se destruían al tercer lavado. Decidimos hacer las cosas diferente." },
-          { title:"El proceso", text:"Trabajamos directamente con productores de algodón pima en Perú y proveedores de telas en Chile. Sin intermediarios. Eso nos permite ofrecer calidad premium a precios honestos." },
-          { title:"El equipo", text:"Somos un equipo pequeño de diseñadores, textileros y emprendedores. Revisamos cada lote personalmente. Cada polera que llega a tus manos pasó por las nuestras." },
-        ].map(s => (
-          <div key={s.title} style={{ marginBottom:48 }}>
-            <h2 style={{ fontFamily:FONT.display, fontSize:28, fontWeight:700, marginBottom:12, color:T.accent }}>{s.title}</h2>
-            <p style={{ fontSize:16, lineHeight:1.8, color:"#444" }}>{s.text}</p>
+          {
+            tag:"El problema",
+            title:"La ropa de gym era fea o cara",
+            text:"Buscábamos poleras para entrenar que fueran cómodas de verdad — oversize, con tela buena, que no se pegaran al cuerpo. Que se vieran bien tanto en el gym como en la calle. No existía eso en Chile a precio justo."
+          },
+          {
+            tag:"La idea",
+            title:"Viste bien, viste macizo 😎",
+            text:"Creamos MACIZOS con una premisa simple: la ropa para entrenar tiene que hacerte sentir y verte bien desde el momento en que te la pones. No importa si llevas 2 meses en el gym o 10 años. No importa tu peso ni tu condición física. Si te ves macizo, te motivas. Y si te motivas, entrenas. Punto."
+          },
+          {
+            tag:"El producto",
+            title:"Oversize y baggy con propósito",
+            text:"Elegimos corte oversize en poleras y baggy en buzos porque son los cortes que mejor le quedan a todos los cuerpos durante el entrenamiento. Dan libertad de movimiento, no marcan, y tienen una estética limpia y moderna. La tela es heavyweight — se siente premium y dura mucho más que una polera corriente."
+          },
+        ].map((s, i) => (
+          <div key={i} style={{ marginBottom:60, paddingBottom:60, borderBottom: i<2 ? `1px solid ${T.borderL}` : "none" }}>
+            <span style={{ display:"inline-block", background:T.lime, color:T.black, padding:"3px 12px", borderRadius:4, fontSize:11, fontWeight:800, letterSpacing:2, marginBottom:14, textTransform:"uppercase" }}>{s.tag}</span>
+            <h2 style={{ fontFamily:FONT.display, fontSize:"clamp(24px,4vw,38px)", letterSpacing:2, marginBottom:16, lineHeight:1.1 }}>{s.title.toUpperCase()}</h2>
+            <p style={{ fontSize:16, lineHeight:1.85, color:"#555" }}>{s.text}</p>
           </div>
         ))}
-        <button className="btn-primary" onClick={() => setPage("store")}
-          style={{ padding:"14px 36px", background:T.accent, color:T.white, borderRadius:10, fontSize:15, fontWeight:700 }}>
-          Ver Colección →
+
+        <button className="btn-lime" onClick={() => setPage("store")}
+          style={{ padding:"16px 40px", background:T.lime, color:T.black, borderRadius:10, fontSize:15, fontWeight:800, letterSpacing:1.5 }}>
+          VER LA COLECCIÓN →
         </button>
       </div>
     </div>
@@ -1077,47 +904,40 @@ function ContactPage() {
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name:"", email:"", message:"" });
 
-  const handleSubmit = () => {
-    // TODO: connect to email API / form backend
-    if (form.name && form.email && form.message) { setSent(true); }
-  };
-
   return (
-    <div style={{ paddingTop:80 }}>
-      <div style={{ background:T.dark, padding:"60px 5%", textAlign:"center" }}>
-        <h1 style={{ fontFamily:FONT.display, fontSize:48, color:T.white }}>Contacto</h1>
+    <div style={{ paddingTop:68 }}>
+      <div style={{ background:T.dark, padding:"64px 5%", textAlign:"center" }}>
+        <h1 style={{ fontFamily:FONT.display, fontSize:"clamp(36px,6vw,72px)", color:T.white, letterSpacing:4 }}>CONTACTO</h1>
+        <p style={{ color:"rgba(255,255,255,0.4)", marginTop:10, fontSize:14, letterSpacing:1 }}>Escríbenos, respondemos rápido</p>
       </div>
-      <div style={{ maxWidth:600, margin:"0 auto", padding:"60px 5%" }}>
+      <div style={{ maxWidth:580, margin:"0 auto", padding:"60px 5%" }}>
         {sent ? (
           <div className="fade-in" style={{ textAlign:"center", padding:"40px" }}>
             <div style={{ fontSize:56 }}>✉️</div>
-            <h2 style={{ fontFamily:FONT.display, fontSize:28, margin:"20px 0 10px" }}>Mensaje recibido</h2>
-            <p style={{ color:T.muted }}>Te responderemos dentro de 24 horas hábiles.</p>
+            <h2 style={{ fontFamily:FONT.display, fontSize:28, letterSpacing:2, margin:"20px 0 10px" }}>MENSAJE ENVIADO</h2>
+            <p style={{ color:T.muted }}>Te respondemos dentro de 24 horas.</p>
           </div>
         ) : (
-          <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            {[["Nombre","name","text","Tu nombre"],["Email","email","email","tu@email.com"]].map(([label,field,type,ph]) => (
+              <div key={field}>
+                <label style={{ fontSize:12, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", display:"block", marginBottom:8 }}>{label}</label>
+                <input type={type} value={form[field]} onChange={e => setForm(f=>({...f,[field]:e.target.value}))}
+                  style={{ width:"100%", padding:"13px 16px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14, background:T.white }} placeholder={ph}/>
+              </div>
+            ))}
             <div>
-              <label style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:6 }}>Nombre</label>
-              <input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))}
-                style={{ width:"100%", padding:"12px 16px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14 }} placeholder="Tu nombre"/>
-            </div>
-            <div>
-              <label style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:6 }}>Email</label>
-              <input type="email" value={form.email} onChange={e => setForm(f=>({...f,email:e.target.value}))}
-                style={{ width:"100%", padding:"12px 16px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14 }} placeholder="tu@email.com"/>
-            </div>
-            <div>
-              <label style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:6 }}>Mensaje</label>
+              <label style={{ fontSize:12, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", display:"block", marginBottom:8 }}>Mensaje</label>
               <textarea value={form.message} onChange={e => setForm(f=>({...f,message:e.target.value}))} rows={5}
-                style={{ width:"100%", padding:"12px 16px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14, resize:"vertical" }} placeholder="¿En qué podemos ayudarte?"/>
+                style={{ width:"100%", padding:"13px 16px", border:`1.5px solid ${T.borderL}`, borderRadius:10, fontSize:14, resize:"vertical" }} placeholder="¿En qué podemos ayudarte?"/>
             </div>
-            <button className="btn-primary" onClick={handleSubmit}
-              style={{ padding:"14px", background:T.accent, color:T.white, borderRadius:10, fontSize:15, fontWeight:700 }}>
-              Enviar Mensaje
+            <button className="btn-lime" onClick={() => { if(form.name&&form.email&&form.message) setSent(true); }}
+              style={{ padding:"15px", background:T.lime, color:T.black, borderRadius:10, fontSize:14, fontWeight:800, letterSpacing:1.5, marginTop:8 }}>
+              ENVIAR MENSAJE
             </button>
-            <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:16, color:T.muted, fontSize:14 }}>
-              <p>📧 hola@veste.cl</p>
-              <p>📱 Instagram: @veste.cl</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:12, color:T.muted, fontSize:14, paddingTop:20, borderTop:`1px solid ${T.borderL}` }}>
+              <p>📱 Instagram: <strong>@macizos.cl</strong></p>
+              <p>📧 hola@macizos.cl</p>
               <p>📍 Santiago, Chile</p>
             </div>
           </div>
@@ -1132,52 +952,45 @@ function ContactPage() {
 // ─────────────────────────────────────────────
 function Footer({ setPage }) {
   return (
-    <footer style={{ background:T.dark, color:"rgba(255,255,255,0.7)", padding:"60px 5% 30px" }}>
+    <footer style={{ background:T.darker, color:"rgba(255,255,255,0.55)", padding:"56px 5% 28px" }}>
       <div style={{ maxWidth:1280, margin:"0 auto" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:40, marginBottom:48 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:40, marginBottom:48 }}>
           <div>
-            <button onClick={() => setPage("home")} style={{ fontFamily:FONT.display, fontSize:24, fontWeight:700, color:T.white, marginBottom:12, display:"block" }}>
-              VESTE<span style={{ color:T.accent }}>.</span>
+            <button onClick={() => setPage("home")} style={{ fontFamily:FONT.display, fontSize:32, letterSpacing:4, color:T.white, marginBottom:12, display:"block" }}>
+              MACIZOS<span style={{ color:T.lime }}>.</span>
             </button>
-            <p style={{ fontSize:14, lineHeight:1.7 }}>Poleras de calidad premium, hechas para durar. Santiago, Chile.</p>
-            <div style={{ display:"flex", gap:14, marginTop:20 }}>
-              {["IG","TK","FB"].map(s => (
-                <div key={s} style={{ width:36, height:36, border:"1px solid rgba(255,255,255,0.2)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.6)", cursor:"pointer" }}>
-                  {s}
-                </div>
+            <p style={{ fontSize:14, lineHeight:1.7, marginBottom:20 }}>Viste bien, viste macizo 😎. Ropa para entrenar con estilo. Santiago, Chile.</p>
+            <div style={{ display:"flex", gap:10 }}>
+              {["IG","TK"].map(s => (
+                <div key={s} style={{ width:36, height:36, border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800, color:"rgba(255,255,255,0.5)", cursor:"pointer" }}>{s}</div>
               ))}
             </div>
           </div>
           <div>
-            <h3 style={{ fontSize:13, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", color:T.white, marginBottom:16 }}>Tienda</h3>
-            {["Básicas","Premium","Gráficas","Novedades","Sale"].map(l => (
-              <button key={l} onClick={() => setPage("store")} style={{ display:"block", fontSize:14, marginBottom:8, color:"rgba(255,255,255,0.6)", textAlign:"left" }}>{l}</button>
+            <h3 style={{ fontSize:12, fontWeight:700, letterSpacing:2, textTransform:"uppercase", color:T.white, marginBottom:16 }}>Tienda</h3>
+            {["Poleras Oversize","Buzos Baggy","Promo 2x1"].map(l => (
+              <button key={l} onClick={() => setPage("store")} style={{ display:"block", fontSize:14, marginBottom:10, color:"rgba(255,255,255,0.45)", textAlign:"left" }}>{l}</button>
             ))}
           </div>
           <div>
-            <h3 style={{ fontSize:13, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", color:T.white, marginBottom:16 }}>Ayuda</h3>
-            {["Guía de tallas","Envíos","Cambios y devoluciones","Cuidado de la prenda","FAQ"].map(l => (
-              <button key={l} style={{ display:"block", fontSize:14, marginBottom:8, color:"rgba(255,255,255,0.6)", textAlign:"left" }}>{l}</button>
+            <h3 style={{ fontSize:12, fontWeight:700, letterSpacing:2, textTransform:"uppercase", color:T.white, marginBottom:16 }}>Info</h3>
+            {["Guía de tallas","Envíos","Cambios","Nosotros"].map(l => (
+              <button key={l} style={{ display:"block", fontSize:14, marginBottom:10, color:"rgba(255,255,255,0.45)", textAlign:"left" }}>{l}</button>
             ))}
           </div>
           <div>
-            <h3 style={{ fontSize:13, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", color:T.white, marginBottom:16 }}>Contacto</h3>
-            <p style={{ fontSize:14, marginBottom:8 }}>hola@veste.cl</p>
-            <p style={{ fontSize:14, marginBottom:8 }}>@veste.cl</p>
-            <p style={{ fontSize:14 }}>Lunes–Viernes 9:00–18:00</p>
-            <button onClick={() => setPage("contact")}
-              style={{ marginTop:20, padding:"10px 20px", border:"1px solid rgba(255,255,255,0.3)", borderRadius:8, fontSize:13, color:"rgba(255,255,255,0.8)" }}>
-              Enviar mensaje
+            <h3 style={{ fontSize:12, fontWeight:700, letterSpacing:2, textTransform:"uppercase", color:T.white, marginBottom:16 }}>Contacto</h3>
+            <p style={{ fontSize:14, marginBottom:8 }}>hola@move.cl</p>
+            <p style={{ fontSize:14, marginBottom:20 }}>@move.cl</p>
+            <button onClick={() => setPage("contact")} className="btn-lime"
+              style={{ padding:"10px 22px", background:T.lime, color:T.black, borderRadius:8, fontSize:13, fontWeight:800, letterSpacing:1 }}>
+              ESCRIBIR
             </button>
           </div>
         </div>
-        <div style={{ borderTop:"1px solid rgba(255,255,255,0.1)", paddingTop:24, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
-          <p style={{ fontSize:13 }}>© 2025 VESTE. Todos los derechos reservados.</p>
-          <div style={{ display:"flex", gap:20 }}>
-            {["Privacidad","Términos","Cookies"].map(l => (
-              <button key={l} style={{ fontSize:12, color:"rgba(255,255,255,0.4)" }}>{l}</button>
-            ))}
-          </div>
+        <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", paddingTop:24, display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+          <p style={{ fontSize:13 }}>© 2025 MACIZOS. Todos los derechos reservados.</p>
+          <p style={{ fontSize:12, color:"rgba(255,255,255,0.25)" }}>Hecho con 💪 en Santiago</p>
         </div>
       </div>
     </footer>
@@ -1185,14 +998,14 @@ function Footer({ setPage }) {
 }
 
 // ─────────────────────────────────────────────
-// NOTIFICATION TOAST
+// TOAST
 // ─────────────────────────────────────────────
 function Toast() {
   const { notification } = useContext(CartContext);
   if (!notification) return null;
   return (
-    <div className="slide-in" style={{ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:T.dark, color:T.white, padding:"14px 24px", borderRadius:12, fontSize:14, fontWeight:600, zIndex:300, boxShadow:"0 8px 32px rgba(0,0,0,0.25)", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:10 }}>
-      <span style={{ color:T.success }}>✓</span> {notification}
+    <div className="slide-in" style={{ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:T.dark, border:`1px solid ${T.lime}`, color:T.white, padding:"13px 24px", borderRadius:12, fontSize:14, fontWeight:700, zIndex:300, boxShadow:"0 8px 32px rgba(0,0,0,0.35)", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:10 }}>
+      <span style={{ color:T.lime, fontSize:16 }}>✓</span> {notification}
     </div>
   );
 }
@@ -1206,11 +1019,11 @@ export default function App() {
 
   const navigate = (p) => {
     setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top:0, behavior:"smooth" });
   };
 
   const renderPage = () => {
-    switch (page) {
+    switch(page) {
       case "home":    return <HomePage setPage={navigate} setSelectedProduct={setSelectedProduct}/>;
       case "store":   return <StorePage setPage={navigate} setSelectedProduct={setSelectedProduct}/>;
       case "product": return selectedProduct ? <ProductDetailPage product={selectedProduct} setPage={navigate}/> : <StorePage setPage={navigate} setSelectedProduct={setSelectedProduct}/>;
@@ -1225,9 +1038,7 @@ export default function App() {
       <style>{CSS}</style>
       <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column" }}>
         <Navbar page={page} setPage={navigate}/>
-        <main style={{ flex:1 }}>
-          {renderPage()}
-        </main>
+        <main style={{ flex:1 }}>{renderPage()}</main>
         <Footer setPage={navigate}/>
         <CartDrawer/>
         <Toast/>
